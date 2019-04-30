@@ -33,16 +33,12 @@ const createUser = (request, response) => {
   console.log("REQUEST Query", request.query);
   const { autodesk_id, autodesk_username, autodesk_display_name, email } = request.query;
   console.log('USING AUTODESK ID', autodesk_id);
-
   pool.query('SELECT id FROM users WHERE autodesk_id = $1', [autodesk_id], (error, results) => {
-    console.log("SQL RESULT", results.rows)
-
     if (results.rows.length == 0) {
       console.log("rows tots nil");
       // insert
       pool.query('INSERT INTO users (email, autodesk_id, autodesk_username, autodesk_displayname, created_at, last_login_at) VALUES ($1, $2, $3, $4, to_timestamp($5), to_timestamp($5)) RETURNING id', [email, autodesk_id, autodesk_username, autodesk_display_name, (Date.now() / 1000.0)], (error, results) => {
-        console.log("final user", results);
-        console.log("final user", results.rows[0].id);
+        console.log("final user id:", results.rows[0].id);
         if (error) {
           throw error
         }
@@ -50,7 +46,7 @@ const createUser = (request, response) => {
 
     } else {
       // return existing id
-      console.log('User found first', results.rows[0].id);
+      console.log('User found first id:', results.rows[0].id);
       // update last iniatated
     }
 
@@ -62,8 +58,10 @@ const createUser = (request, response) => {
 }
 
 const createEvent = (request, response) => {
-  console.log("REQUEST Query", request.query);
-  const { autodesk_id, name, payload, event_time } = request.query;
+  //console.log("REQUEST Query", request);
+  console.log("REQUEST JSON", request.body);
+  //console.log("REQUEST Query", request.query);
+  const { autodesk_id, name, event_time, payload } = request.body;
   console.log('USING AUTODESK ID', autodesk_id);
 
   pool.query('SELECT id FROM users WHERE autodesk_id = $1', [autodesk_id], (error, userSelectResults) => {
@@ -81,7 +79,7 @@ const createEvent = (request, response) => {
           }
           resultEventId = eventInsertResults.rows[0].id;
           console.log("EVENT INSERTED", resultEventId);
-          pool.query('INSERT INTO user_events (user_id, event_id, event_at, created_at) VALUES ($1, $2, $3, to_timestamp($4)) RETURNING id', [resultUserId, resultEventId, event_time, (Date.now() / 1000.0)], (error, userEventInsertResults) => {
+          pool.query('INSERT INTO user_events (user_id, event_id, event_at, payload, created_at) VALUES ($1, $2, $3, $4, to_timestamp($5)) RETURNING id', [resultUserId, resultEventId, event_time, payload, (Date.now() / 1000.0)], (error, userEventInsertResults) => {
             if (error) {
               throw error
             }
@@ -94,7 +92,7 @@ const createEvent = (request, response) => {
         // Event found
         resultEventId = eventsSelectResults.rows[0].id;
         console.log("EVENT FOUND", resultEventId)
-        pool.query('INSERT INTO user_events (user_id, event_id, event_at, created_at) VALUES ($1, $2, $3, to_timestamp($4)) RETURNING id', [resultUserId, resultEventId, event_time, (Date.now() / 1000.0)], (error, userEventInsertResults) => {
+        pool.query('INSERT INTO user_events (user_id, event_id, event_at, payload, created_at) VALUES ($1, $2, $3, $4, to_timestamp($5)) RETURNING id', [resultUserId, resultEventId, event_time, payload, (Date.now() / 1000.0)], (error, userEventInsertResults) => {
             if (error) {
               throw error
             }
