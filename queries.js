@@ -30,13 +30,84 @@ const getUserById = (request, response) => {
 }
 
 const createUser = (request, response) => {
-  const { name, email } = request.body
+  console.log("REQUEST Query", request.query);
+  const { autodesk_id, autodesk_username, autodesk_display_name, email } = request.query;
+  console.log('USING AUTODESK ID', autodesk_id);
 
-  pool.query('INSERT INTO users (name, email) VALUES ($1, $2)', [name, email], (error, results) => {
+  pool.query('SELECT id FROM users WHERE autodesk_id = $1', [autodesk_id], (error, results) => {
+    console.log("SQL RESULT", results.rows)
+
+    if (results.rows.length == 0) {
+      console.log("rows tots nil");
+      // insert
+      pool.query('INSERT INTO users (email, autodesk_id, autodesk_username, autodesk_displayname, created_at, last_login_at) VALUES ($1, $2, $3, $4, to_timestamp($5), to_timestamp($5)) RETURNING id', [email, autodesk_id, autodesk_username, autodesk_display_name, (Date.now() / 1000.0)], (error, results) => {
+        console.log("final user", results);
+        console.log("final user", results.rows[0].id);
+        if (error) {
+          throw error
+        }
+      })
+
+    } else {
+      // return existing id
+      console.log('User found first', results.rows[0].id);
+      // update last iniatated
+    }
+
     if (error) {
       throw error
     }
-    response.status(201).send(`User added with ID: ${result.insertId}`)
+    response.status(200).send(`User found?`)
+  })
+}
+
+const createEvent = (request, response) => {
+  console.log("REQUEST Query", request.query);
+  const { autodesk_id, name, payload, event_time } = request.query;
+  console.log('USING AUTODESK ID', autodesk_id);
+
+  pool.query('SELECT id FROM users WHERE autodesk_id = $1', [autodesk_id], (error, userSelectResults) => {
+    console.log("SQL RESULT", userSelectResults.rows)
+    // find or create event
+    resultUserId = userSelectResults.rows[0].id;
+    console.log("USER FOUND", resultUserId);
+    pool.query('SELECT id FROM events WHERE name = $1', [name], (error, eventsSelectResults) => {
+      if (eventsSelectResults.rows.length == 0) {
+        // Event not found
+        console.log("EVENT NOT FOUND")
+        pool.query('INSERT INTO events (name, created_at) VALUES ($1, to_timestamp($2)) RETURNING id', [name, (Date.now() / 1000.0)], (error, eventInsertResults) => {
+          if (error) {
+            throw error
+          }
+          resultEventId = eventInsertResults.rows[0].id;
+          console.log("EVENT INSERTED", resultEventId);
+          pool.query('INSERT INTO user_events (user_id, event_id, event_at, created_at) VALUES ($1, $2, $3, to_timestamp($4)) RETURNING id', [resultUserId, resultEventId, event_time, (Date.now() / 1000.0)], (error, userEventInsertResults) => {
+            if (error) {
+              throw error
+            }
+            resultUserEventId = userEventInsertResults.rows[0].id;
+            console.log("USER EVENT INSERTED", resultUserEventId);
+            response.status(200).send(`USER EVENT CREATED ${resultUserEventId}`)
+          })
+        })
+      } else {
+        // Event found
+        resultEventId = eventsSelectResults.rows[0].id;
+        console.log("EVENT FOUND", resultEventId)
+        pool.query('INSERT INTO user_events (user_id, event_id, event_at, created_at) VALUES ($1, $2, $3, to_timestamp($4)) RETURNING id', [resultUserId, resultEventId, event_time, (Date.now() / 1000.0)], (error, userEventInsertResults) => {
+            if (error) {
+              throw error
+            }
+            resultUserEventId = userEventInsertResults.rows[0].id;
+            console.log("USER EVENT INSERTED", resultUserEventId);
+            response.status(200).send(`USER EVENT CREATED ${resultUserEventId}`)
+        })
+      }
+    })
+
+    if (error) {
+      throw error
+    }
   })
 }
 
@@ -73,6 +144,7 @@ module.exports = {
   getUsers,
   getUserById,
   createUser,
+  createEvent,
   updateUser,
   deleteUser,
 }
